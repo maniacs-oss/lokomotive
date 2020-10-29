@@ -55,7 +55,7 @@ component "velero" {
 
 	component := newComponent()
 
-	body, diagnostics := util.GetComponentBody(configHCL, name)
+	body, diagnostics := util.GetComponentBody(configHCL, Name)
 	if diagnostics != nil {
 		t.Fatalf("Error getting component body: %v", diagnostics)
 	}
@@ -99,7 +99,7 @@ component "velero" {
 
 	component := newComponent()
 
-	body, diagnostics := util.GetComponentBody(configHCL, name)
+	body, diagnostics := util.GetComponentBody(configHCL, Name)
 	if diagnostics != nil {
 		t.Fatalf("Error getting component body: %v", diagnostics)
 	}
@@ -129,7 +129,7 @@ component "velero" {
 
 	component := newComponent()
 
-	body, d := util.GetComponentBody(configHCL, name)
+	body, d := util.GetComponentBody(configHCL, Name)
 	if d != nil {
 		t.Fatalf("Error getting component body: %v", d)
 	}
@@ -146,7 +146,7 @@ component "velero" {}
 
 	component := newComponent()
 
-	body, d := util.GetComponentBody(configHCL, name)
+	body, d := util.GetComponentBody(configHCL, Name)
 	if d != nil {
 		t.Fatalf("Error getting component body: %v", d)
 	}
@@ -172,7 +172,7 @@ component "velero" {
 
 	component := newComponent()
 
-	body, d := util.GetComponentBody(configHCL, name)
+	body, d := util.GetComponentBody(configHCL, Name)
 	if d != nil {
 		t.Fatalf("Error getting component body: %v", d)
 	}
