@@ -15,7 +15,6 @@
 package platform
 
 import (
-	"fmt"
 	"path/filepath"
 
 	"github.com/hashicorp/hcl/v2"
@@ -90,31 +89,6 @@ type Meta struct {
 	AssetDir      string
 	ExpectedNodes int
 	Managed       bool
-}
-
-// platforms is a collection where all platforms gets automatically registered
-var platforms map[string]Platform
-
-// initialize package's global variable when package is imported
-func init() {
-	platforms = make(map[string]Platform)
-}
-
-// Register adds platform into internal map
-func Register(name string, p Platform) {
-	if _, exists := platforms[name]; exists {
-		panic(fmt.Sprintf("platform with name %q registered already", name))
-	}
-	platforms[name] = p
-}
-
-// GetPlatform returns platform based on the name
-func GetPlatform(name string) (Platform, error) {
-	platform, exists := platforms[name]
-	if !exists {
-		return nil, fmt.Errorf("no platform with name %q found", name)
-	}
-	return platform, nil
 }
 
 // AppendVersionTag appends the lokoctl-version tag to a given tags map.
