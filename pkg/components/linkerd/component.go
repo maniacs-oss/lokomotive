@@ -39,7 +39,7 @@ const (
 
 //nolint:gochecknoinits
 func init() {
-	components.Register(name, newComponent())
+	components.Register(Name, NewConfig())
 }
 
 type component struct {
@@ -56,7 +56,10 @@ type cert struct {
 	Expiry string
 }
 
-func newComponent() *component {
+// NewConfig returns new Linkerd component configuration with default values set.
+//
+//nolint:golint
+func NewConfig() *component {
 	return &component{
 		ControllerReplicas: 1,
 		EnableMonitoring:   false,
