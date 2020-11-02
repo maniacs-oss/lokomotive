@@ -37,11 +37,6 @@ const (
 	certCommonName = "identity.linkerd.cluster.local"
 )
 
-//nolint:gochecknoinits
-func init() {
-	components.Register(Name, NewConfig())
-}
-
 type component struct {
 	ControllerReplicas int  `hcl:"controller_replicas,optional"`
 	EnableMonitoring   bool `hcl:"enable_monitoring,optional"`
