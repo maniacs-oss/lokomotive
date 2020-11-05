@@ -25,13 +25,13 @@ for details on how to identify what the next version should be.
   - `git clean -ffdx && make all` should work.
   - CI should be green.
 
-- Update the [release notes](../CHANGELOG.md). Try to capture most of the salient
+- Update the [release notes](../../CHANGELOG.md). Try to capture most of the salient
   changes since the last release, but don't go into unnecessary detail (better
   to link/reference the documentation wherever possible).
   `scripts/changelog.sh` will help generating an initial list of changes.
   Correct/fix entries if necessary, and group them by category.
 
-- Update [installation guide](../docs/installer/lokoctl.md) to reference to new
+- Update [installation guide](../../docs/installer/lokoctl.md) to reference to new
   version.
 
 Even though it is set at build time, the Lokomotive version is also hardcoded
