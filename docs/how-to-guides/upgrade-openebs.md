@@ -14,9 +14,9 @@
 
 ## Introduction
 
-This guide provides installation steps to upgrade OpenEBS dataplane components
-from `v1.12.0` to `v2.2.0` and migrate from cStor Pools/Volumes to latest CSI based provisioning
-(CSPC Pools/Volumes).
+This guide provides steps to upgrade OpenEBS dataplane components from `v1.12.0`
+to `v2.2.0` and migrate from cStor Pools/Volumes to latest CSI based
+provisioning (CSPC Pools/Volumes).
 
 ## Prerequisites
 
@@ -28,8 +28,9 @@ To upgrade the OpenEBS data plane components, we need the following:
     v0.6.0
     ```
 
-* A Lokomotive cluster accessible via `kubectl` deployed on a [Equinix]
-    metal(https://metal.equinix.com/).
+* A Lokomotive cluster accessible via `kubectl` deployed on a
+  [Equinix metal](../configuration-reference/platforms/packet.md) or
+  [Bare metal](../configuration-reference/platforms/baremetal.md).
 
 * OpenEBS `v1.12.0` installed. You can check if OpenEBS is indeed in expected
     version:
@@ -38,13 +39,38 @@ To upgrade the OpenEBS data plane components, we need the following:
     ```
 
 * Highly recommended to schedule a downtime for the applications consuming the
-    OpenEBS PV and make sure to take a backup of the data before starting the
-    below upgrade procedure.
+  OpenEBS PV and make sure to take a backup of the data before starting the
+  below upgrade procedure. Lokomotive provides
+  [Velero](../configuration-reference/components/velero.md) component for backup
+  and restore.
+
+* Ensure the cluster and OpenEBS volumes are is in healthy state before proceeding.
+    ```bash
+    $ lokoctl health
+    Node                    Ready    Reason          Message
+
+    alpha-controller-0      True     KubeletReady    kubelet is posting ready status
+    alpha-large-worker-0    True     KubeletReady    kubelet is posting ready status
+    Name      Status    Message              Error
+
+    etcd-0    True      {"health":"true"}
 
 
+   $ kubectl get cstorpools -n openebs # Status should be Healthy.
+
+   NAME                                ALLOCATED   FREE   CAPACITY   STATUS    READONLY   TYPE      AGE
+   cstor-pool-openebs-replica-1-w3r7   6.98G       437G   444G       Healthy   false      striped   4d22h
+
+
+   $ kubectl get cstorvolume -n openebs # Status should be Healthy.
+
+   NAME                                       STATUS    AGE     CAPACITY
+   pvc-183dc3df-a7d9-4273-a8e2-7f66d2e19f4e   Healthy   3d20h   50Gi
+   pvc-5d4b4c2b-2ed5-4e75-aeb9-fbd2918ebb78   Healthy   3d20h   50Gi
+   ```
 ## Steps
 
-###Step 1: Upgrade OpenEBS control plane components
+### Step 1: Upgrade OpenEBS control plane components
 
 Lokomotive provides an easy way of upgrading the OpenEBS control plane.
 
@@ -82,6 +108,9 @@ cstor-pool-openebs-replica-3   2d21h26m
 Create a Job to upgrade the existing cStor pools:
 
 ```bash
+OPENEBS_NEW_VERSION=2.2.0
+OPENEBS_OLD_VERSION=1.12.0
+cat > upgrade-cstor-pools-1120-220.yaml <<EOF
 # upgrade-cstor-pools-1120-220.yaml
 
 #This is an example YAML for upgrading cstor SPC.
@@ -95,13 +124,9 @@ metadata:
   #VERIFY that you have provided a unique name for this upgrade job.
   #The name can be any valid K8s string for name. This example uses
   #the following convention: cstor-spc-<flattened-from-to-versions>
-  name: cstor-spc-1120220
-
-  #VERIFY the value of namespace is same as the namespace where openebs components
-  # are installed. You can verify using the command:
-  # `kubectl get pods -n <openebs-namespace> -l openebs.io/component-name=maya-apiserver`
-  # The above command should return status of the openebs-apiserver.
+  generateName: cstor-spc-1120220-
   namespace: openebs
+
 spec:
   backoffLimit: 4
   template:
@@ -113,10 +138,10 @@ spec:
         - "cstor-spc"
 
         # --from-version is the current version of the pool
-        - "--from-version=1.12.0"
+        - "--from-version=${OPENEBS_OLD_VERSION}"
 
         # --to-version is the version desired upgrade version
-        - "--to-version=2.2.0"
+        - "--to-version=${OPENEBS_NEW_VERSION}"
 
         # Bulk upgrade is supported
         # To make use of it, please provide the list of SPCs
@@ -136,16 +161,16 @@ spec:
 
         # the image version should be same as the --to-version mentioned above
         # in the args of the job
-        image: openebs/m-upgrade:2.2.0
+        image: openebs/m-upgrade:${OPENEBS_NEW_VERSION}
         imagePullPolicy: Always
       restartPolicy: OnFailure
----
+EOF
 ```
 
 Apply the job to start the upgrade for cStor pools:
 
 ```bash
-kubectl apply upgrade-cstor-pools-1120-220.yaml
+kubectl create -f upgrade-cstor-pools-1120-220.yaml
 ```
 
 Ensure the job runs to completion.
@@ -166,6 +191,9 @@ openebs     pvc-e8f8b268-b81c-4201-841a-283f557c44a7   Healthy   2d21h   50Gi
 Create a Kubernetes job to upgrade the existing cStor volumes:
 
 ```bash
+OPENEBS_NEW_VERSION=2.2.0
+OPENEBS_OLD_VERSION=1.12.0
+cat > upgrade-cstor-vols-1120-220.yaml <<EOF
 # upgrade-cstor-vols-1120-220.yaml
 
 #This is an example YAML for upgrading cstor volume.
@@ -179,12 +207,7 @@ metadata:
   #VERIFY that you have provided a unique name for this upgrade job.
   #The name can be any valid K8s string for name. This example uses
   #the following convention: cstor-vol-<flattened-from-to-versions>
-  name: cstor-vol-1120220
-
-  #VERIFY the value of namespace is same as the namespace where openebs components
-  # are installed. You can verify using the command:
-  # `kubectl get pods -n <openebs-namespace> -l openebs.io/component-name=maya-apiserver`
-  # The above command should return status of the openebs-apiserver.
+  generateName: cstor-vol-1120220-
   namespace: openebs
 
 spec:
@@ -198,10 +221,10 @@ spec:
         - "cstor-volume"
 
         # --from-version is the current version of the volume
-        - "--from-version=1.12.0"
+        - "--from-version=${OPENEBS_OLD_VERSION}"
 
         # --to-version is the version desired upgrade version
-        - "--to-version=2.2.0"
+        - "--to-version=${OPENEBS_NEW_VERSION}"
 
         # Bulk upgrade is supported from 1.9
         # To make use of it, please provide the list of PVs
@@ -222,14 +245,14 @@ spec:
 
         # the image version should be same as the --to-version mentioned above
         # in the args of the job
-        image: openebs/m-upgrade:2.2.0
+        image: openebs/m-upgrade:${OPENEBS_NEW_VERSION}
         imagePullPolicy: Always
       restartPolicy: OnFailure
----
+EOF
 ```
 
 ```bash
-kubectl apply upgrade-cstor-vols-1120-220.yaml
+kubectl create -f upgrade-cstor-vols-1120-220.yaml
 ```
 
 Ensure the job runs to completion.
