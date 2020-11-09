@@ -1,3 +1,10 @@
+resource "local_file" "calico_crds" {
+  for_each = fileset("${var.asset_dir}/charts/kube-system/calico/crds", "*.yaml")
+
+  content  = file("${var.asset_dir}/charts/kube-system/calico/crds/${each.value}")
+  filename = "${var.asset_dir}/manifests-calico-cdrs/${each.value}"
+}
+
 resource "local_file" "calico_host_protection" {
   content = templatefile("${path.module}/calico-host-protection.yaml.tmpl", {
     host_endpoints = [
