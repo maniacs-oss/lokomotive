@@ -50,6 +50,8 @@ spec:
           value: metallb.lokomotive.io/peer-asn
         - name: PACKET_ANNOTATION_PEER_IPS
           value: metallb.lokomotive.io/peer-address
+        - name: PACKET_LB_CONFIGMAP
+          value: disabled
         resources:
           requests:
             cpu: 100m
