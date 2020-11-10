@@ -86,3 +86,61 @@ func TestBGPDisabled(t *testing.T) {
 		t.Fatalf("Worker pool with BGP disabled should not have any BGP sessions")
 	}
 }
+
+func Test_When_BGP_is_not_disabled_in_configuration_servers_has_BGP_session_created(t *testing.T) {
+	client := testutil.CreateKubeClient(t)
+
+	cl, err := packngo.NewClient()
+	if err != nil {
+		t.Fatalf("Creating Packet API client: %v", err)
+	}
+
+	projectID := os.Getenv("PACKET_PROJECT_ID")
+	if projectID == "" {
+		t.Fatalf("Packet project ID can't be empty. Is %q environment variable set?", "PACKET_PROJECT_ID")
+	}
+
+	nodeLabel := "lokomotive.alpha.kinvolk.io/bgp-enabled=true"
+
+	nodesList, err := client.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{
+		LabelSelector: nodeLabel,
+	})
+	if err != nil {
+		t.Fatalf("Listing nodes with label %q: %v", nodeLabel, err)
+	}
+
+	nodes := nodesList.Items
+	if len(nodes) < 1 {
+		t.Fatalf("Wanted one or more nodes with label %q, found none.", nodeLabel)
+	}
+
+	hostname := nodes[0].Name
+
+	devices, _, err := cl.Devices.List(projectID, nil)
+	if err != nil {
+		t.Fatalf("Listing devices in project %q: %v", projectID, err)
+	}
+
+	deviceID := ""
+
+	for _, device := range devices {
+		if device.Hostname == hostname {
+			deviceID = device.ID
+
+			break
+		}
+	}
+
+	if deviceID == "" {
+		t.Fatalf("No Packet device found with hostname %q", hostname)
+	}
+
+	sessions, _, err := cl.Devices.ListBGPSessions(deviceID, nil)
+	if err != nil {
+		t.Fatalf("Getting BGP sessions for device %q: %v", deviceID, err)
+	}
+
+	if len(sessions) == 0 {
+		t.Fatalf("Worker pool with BGP not disabled should have at least one BGP session")
+	}
+}
