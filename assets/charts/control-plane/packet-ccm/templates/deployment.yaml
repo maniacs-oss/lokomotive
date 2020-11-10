@@ -32,7 +32,7 @@ spec:
         - key: "node-role.kubernetes.io/master"
           effect: NoSchedule
       containers:
-      - image: packethost/packet-ccm:{{.Chart.AppVersion}}
+      - image: quay.io/invidian/packet-ccm:latest-amd64
         name: packet-cloud-controller-manager
         command:
           - "./packet-cloud-controller-manager"
