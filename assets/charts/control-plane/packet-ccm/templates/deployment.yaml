@@ -41,6 +41,9 @@ spec:
           - "--allow-untagged-cloud=true"
           - "--provider-config=/etc/cloud-sa/cloud-sa.json"
           - "--v=2"
+        env:
+        - name: PACKET_BGP_NODE_SELECTOR
+          value: lokomotive.alpha.kinvolk.io/bgp-enabled=true
         resources:
           requests:
             cpu: 100m
