@@ -21,6 +21,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart"
+	"helm.sh/helm/v3/pkg/storage/driver"
 	"sigs.k8s.io/yaml"
 
 	"github.com/kinvolk/lokomotive/pkg/backend"
@@ -219,7 +220,55 @@ func (c controlplaneUpdater) upgradeComponent(component, namespace string) error
 	}
 
 	if !exists {
+		return fmt.Errorf("unable to upgrade non existing controlplane component")
+	}
+
+	update := action.NewUpgrade(actionConfig)
+
+	update.Atomic = true
+
+	fmt.Printf("Ensuring controlplane component '%s' is up to date... ", component)
+
+	if _, err := update.Run(component, helmChart, values); err != nil {
+		fmt.Println("Failed!")
+
+		return fmt.Errorf("updating controlplane component: %w", err)
+	}
+
+	fmt.Println("Done.")
+
+	return nil
+}
+
+//nolint:funlen
+func (c controlplaneUpdater) ensureComponent(component, namespace string) error {
+	actionConfig, err := util.HelmActionConfig(namespace, c.kubeconfig)
+	if err != nil {
+		return fmt.Errorf("initializing Helm action: %w", err)
+	}
+
+	histClient := action.NewHistory(actionConfig)
+	histClient.Max = 1
+
+	history, err := histClient.Run(component)
+	if err != nil && err != driver.ErrReleaseNotFound {
+		return fmt.Errorf("checking for chart history: %w", err)
+	}
+
+	exists := err != driver.ErrReleaseNotFound
+
+	if !exists {
 		fmt.Printf("Controlplane component '%s' is missing, reinstalling...", component)
+
+		helmChart, err := c.getControlplaneChart(component)
+		if err != nil {
+			return fmt.Errorf("loading chart from assets: %w", err)
+		}
+
+		values, err := c.getControlplaneValues(component)
+		if err != nil {
+			return fmt.Errorf("getting chart values from Terraform: %w", err)
+		}
 
 		install := action.NewInstall(actionConfig)
 		install.ReleaseName = component
@@ -234,18 +283,21 @@ func (c controlplaneUpdater) upgradeComponent(component, namespace string) error
 		}
 
 		fmt.Println("Done.")
+
+		return nil
 	}
 
-	update := action.NewUpgrade(actionConfig)
+	rollback := action.NewRollback(actionConfig)
 
-	update.Atomic = true
+	rollback.Wait = true
+	rollback.Version = history[0].Version
 
-	fmt.Printf("Ensuring controlplane component '%s' is up to date... ", component)
+	fmt.Printf("Ensuring controlplane component '%s' is properly configured... ", component)
 
-	if _, err := update.Run(component, helmChart, values); err != nil {
+	if err := rollback.Run(component); err != nil {
 		fmt.Println("Failed!")
 
-		return fmt.Errorf("updating controlplane component: %w", err)
+		return fmt.Errorf("ensuring controlplane component: %w", err)
 	}
 
 	fmt.Println("Done.")

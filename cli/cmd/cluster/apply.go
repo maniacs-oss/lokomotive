@@ -56,16 +56,58 @@ func Apply(contextLogger *log.Entry, options ApplyOptions) error {
 		return fmt.Errorf("checking if cluster exists: %w", err)
 	}
 
-	if exists && !options.Confirm {
-		// TODO: We could plan to a file and use it when installing.
-		if err := c.terraformExecutor.Plan(); err != nil {
-			return fmt.Errorf("reconciling cluster state: %v", err)
+	// Prepare for getting kubeconfig.
+	kg := kubeconfigGetter{
+		platformRequired: true,
+	}
+
+	var kubeconfig []byte
+
+	// Prepare controlplane updater.
+	cu := controlplaneUpdater{
+		kubeconfig:    kubeconfig,
+		assetDir:      c.assetDir,
+		contextLogger: *contextLogger,
+		ex:            c.terraformExecutor,
+	}
+
+	charts := platform.CommonControlPlaneCharts()
+
+	if options.UpgradeKubelets {
+		charts = append(charts, helm.LokomotiveChart{
+			Name:      "kubelet",
+			Namespace: "kube-system",
+		})
+	}
+
+	// If cluster exists, ensure that all controlplane components are in the original state.
+	//
+	//nolint:nestif
+	if exists {
+		if !options.Confirm {
+			// TODO: We could plan to a file and use it when installing.
+			if err := c.terraformExecutor.Plan(); err != nil {
+				return fmt.Errorf("reconciling cluster state: %v", err)
+			}
+
+			if !askForConfirmation("Do you want to proceed with cluster apply?") {
+				contextLogger.Println("Cluster apply cancelled")
+
+				return nil
+			}
 		}
 
-		if !askForConfirmation("Do you want to proceed with cluster apply?") {
-			contextLogger.Println("Cluster apply cancelled")
+		var err error
 
-			return nil
+		cu.kubeconfig, err = kg.getKubeconfig(contextLogger, c.lokomotiveConfig)
+		if err != nil {
+			return fmt.Errorf("getting kubeconfig: %v", err)
+		}
+
+		for _, c := range charts {
+			if err := cu.ensureComponent(c.Name, c.Namespace); err != nil {
+				return fmt.Errorf("ensuring controlplane component %q: %w", c.Name, err)
+			}
 		}
 	}
 
@@ -75,11 +117,7 @@ func Apply(contextLogger *log.Entry, options ApplyOptions) error {
 
 	fmt.Printf("\nYour configurations are stored in %s\n", c.assetDir)
 
-	kg := kubeconfigGetter{
-		platformRequired: true,
-	}
-
-	kubeconfig, err := kg.getKubeconfig(contextLogger, c.lokomotiveConfig)
+	kubeconfig, err = kg.getKubeconfig(contextLogger, c.lokomotiveConfig)
 	if err != nil {
 		return fmt.Errorf("getting kubeconfig: %v", err)
 	}
@@ -98,21 +136,7 @@ func Apply(contextLogger *log.Entry, options ApplyOptions) error {
 	if exists && !c.platform.Meta().Managed {
 		fmt.Printf("\nEnsuring that cluster controlplane is up to date.\n")
 
-		cu := controlplaneUpdater{
-			kubeconfig:    kubeconfig,
-			assetDir:      c.assetDir,
-			contextLogger: *contextLogger,
-			ex:            c.terraformExecutor,
-		}
-
-		charts := platform.CommonControlPlaneCharts()
-
-		if options.UpgradeKubelets {
-			charts = append(charts, helm.LokomotiveChart{
-				Name:      "kubelet",
-				Namespace: "kube-system",
-			})
-		}
+		cu.kubeconfig = kubeconfig
 
 		for _, c := range charts {
 			if err := cu.upgradeComponent(c.Name, c.Namespace); err != nil {
