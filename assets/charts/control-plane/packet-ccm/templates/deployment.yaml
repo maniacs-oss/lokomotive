@@ -44,6 +44,12 @@ spec:
         env:
         - name: PACKET_BGP_NODE_SELECTOR
           value: lokomotive.alpha.kinvolk.io/bgp-enabled=true
+        - name: PACKET_ANNOTATION_LOCAL_ASN
+          value: metallb.lokomotive.io/my-asn
+        - name: PACKET_ANNOTATION_PEER_ASNS
+          value: metallb.lokomotive.io/peer-asn
+        - name: PACKET_ANNOTATION_PEER_IPS
+          value: metallb.lokomotive.io/peer-address
         resources:
           requests:
             cpu: 100m
